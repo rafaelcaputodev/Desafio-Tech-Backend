@@ -3,7 +3,9 @@ package com.caputo.DesafioTechBackend.services.impl;
 import com.caputo.DesafioTechBackend.dtos.GeocodeConsumerDto;
 import com.caputo.DesafioTechBackend.interfaces.client.GeocodingFeign;
 import com.caputo.DesafioTechBackend.models.GeolocationResponse;
+import com.caputo.DesafioTechBackend.models.Results;
 import com.caputo.DesafioTechBackend.services.interfaces.GeoCodingService;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,12 +15,12 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 
 @Service
 public class GeoCodingServiceImpl implements GeoCodingService {
 
-    private static Logger logger = (Logger) LoggerFactory.getLogger(GeoCodingServiceImpl.class);
+    private static Logger logger = LoggerFactory.getLogger(GeoCodingServiceImpl.class);
+    List<Double> resultsdistance = new ArrayList<>();
 
     @Value("${key}")
     private String key;
@@ -31,40 +33,48 @@ public class GeoCodingServiceImpl implements GeoCodingService {
 
     @Override
     public List<Double> getGeoCodingForLoc(GeocodeConsumerDto address) {
-        List<Double> resultsdistance = new ArrayList<>();
-
         address.getAddress().forEach(x -> {
-            x = url + x.replace(" ", "+") + "&key=" + key;
+            x = concatenatingUrl(x);
 
-            logger.info("Buscando geolocalização...");
-            GeolocationResponse geolocationResponse = geocodingFeign.getGeocoding(URI.create(x)).getBody();
-            if(geolocationResponse == null){
-                throw new RuntimeException("Não foi possível obter a geolocalização!");
-            }
-            logger.info("Geolocalização encontrada!");
+            GeolocationResponse geolocationResponse = sendingFeign(x);
 
-            geolocationResponse.getResults().forEach(r ->{
-                Long lat1 = r.getGeometry().getViewport().getNortheast().getLat();
-                Long lng1 = r.getGeometry().getViewport().getNortheast().getLng();
-
-                Long lat2 = r.getGeometry().getViewport().getSouthwest().getLat();
-                Long lng2 = r.getGeometry().getViewport().getSouthwest().getLng();
-
-                if ((lat1 == lat2) && (lng1 == lng2)) {
-                    throw new RuntimeException("same location!");
-                }
-                else {
-                    double theta = lng1 - lng2;
-                    double dist = Math.sin(Math.toRadians(lat1)) * Math.sin(Math.toRadians(lat2)) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.cos(Math.toRadians(theta));
-                    dist = Math.acos(dist);
-                    dist = Math.toDegrees(dist);
-                    dist = dist * 60 * 1.1515;
-                    resultsdistance.add(dist);
-                }
-            });
+            geolocationResponse.getResults().forEach(this::euclideanDistanceCalculation);
         });
 
         Collections.sort(resultsdistance);
         return resultsdistance;
+    }
+
+    public GeolocationResponse sendingFeign(String address){
+        logger.info("Buscando geolocalização...");
+        GeolocationResponse geolocationResponse = geocodingFeign.getGeocoding(URI.create(address)).getBody();
+        if(geolocationResponse == null){
+            throw new RuntimeException("Não foi possível obter a geolocalização!");
+        }
+        logger.info("Geolocalização encontrada!");
+        return geolocationResponse;
+    }
+
+    public String concatenatingUrl(String address){
+        return url + address.replace(" ", "+") + "&key=" + key;
+    }
+
+    public void euclideanDistanceCalculation(Results results) {
+        Long lat1 = results.getGeometry().getViewport().getNortheast().getLat();
+        Long lng1 = results.getGeometry().getViewport().getNortheast().getLng();
+
+        Long lat2 = results.getGeometry().getViewport().getSouthwest().getLat();
+        Long lng2 = results.getGeometry().getViewport().getSouthwest().getLng();
+
+        if ((lat1 == lat2) && (lng1 == lng2)) {
+            throw new RuntimeException("same location!");
+        } else {
+            double theta = lng1 - lng2;
+            double dist = Math.sin(Math.toRadians(lat1)) * Math.sin(Math.toRadians(lat2)) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.cos(Math.toRadians(theta));
+            dist = Math.acos(dist);
+            dist = Math.toDegrees(dist);
+            dist = dist * 60 * 1.1515;
+            resultsdistance.add(dist);
+        }
     }
 }
