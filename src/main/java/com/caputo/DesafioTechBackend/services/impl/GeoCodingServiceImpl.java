@@ -20,7 +20,7 @@ import java.util.List;
 public class GeoCodingServiceImpl implements GeoCodingService {
 
     private static Logger logger = LoggerFactory.getLogger(GeoCodingServiceImpl.class);
-    List<Double> resultsdistance = new ArrayList<>();
+    List<Double> resultsDistance = new ArrayList<>();
 
     @Value("${key}")
     private String key;
@@ -41,8 +41,8 @@ public class GeoCodingServiceImpl implements GeoCodingService {
             geolocationResponse.getResults().forEach(this::euclideanDistanceCalculation);
         });
 
-        Collections.sort(resultsdistance);
-        return resultsdistance;
+        Collections.sort(resultsDistance);
+        return resultsDistance;
     }
 
     public GeolocationResponse sendingFeign(String address){
@@ -74,7 +74,7 @@ public class GeoCodingServiceImpl implements GeoCodingService {
             dist = Math.acos(dist);
             dist = Math.toDegrees(dist);
             dist = dist * 60 * 1.1515;
-            resultsdistance.add(dist);
+            resultsDistance.add(dist);
         }
     }
 }
